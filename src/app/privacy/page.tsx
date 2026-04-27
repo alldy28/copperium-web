@@ -51,7 +51,7 @@ export default function PrivacyPolicy() {
               2. Camera Permission & Usage
             </h2>
             <p className="mb-2">
-              Our application requires access to your device's{" "}
+              Our application requires access to your devices{" "}
               <strong>Camera</strong>. This permission is strictly used for the
               following purpose:
             </p>
