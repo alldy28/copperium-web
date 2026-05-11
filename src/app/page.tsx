@@ -66,13 +66,21 @@ export default function LandingPage() {
             >
               Inventory
             </Link>
-            {/* 👇 LINK BARU: LIST QR CODE DITAMBAHKAN DI SINI 👇 */}
             <Link
               href="/list-qrcode"
               className="hover:text-cyan-400 transition-colors"
             >
               List QR Code
             </Link>
+
+            {/* 👇 LINK BARU: STOCKIST DITAMBAHKAN DI SINI 👇 */}
+            <Link
+              href="/stockist"
+              className="hover:text-white transition-colors"
+            >
+              Stockist
+            </Link>
+
             <Link href="#" className="hover:text-white transition-colors">
               Logs
             </Link>

@@ -139,12 +139,14 @@ export async function generateKepingan (productId: number, count: number) {
     console.error('❌ ERROR DI DATABASE:', error)
     try {
       await client.query('ROLLBACK')
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (e) {}
     return { success: false, error: 'Gagal menyimpan' }
   } finally {
     console.log('👉 MENUTUP KONEKSI...')
     try {
       await client.end()
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (e) {}
   }
 }
@@ -231,6 +233,7 @@ export async function getAllKepingan () {
   } finally {
     try {
       await client.end()
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (e) {}
   }
 }
@@ -281,6 +284,97 @@ export async function getKepinganByUuid (uuid: string) {
   } finally {
     try {
       await client.end()
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (e) {}
   }
 }
+
+
+export async function getStockists () {
+  const client = new Client(dbConfig)
+  try {
+    await client.connect()
+    const result = await client.query(
+      'SELECT * FROM stockists ORDER BY id DESC'
+    )
+    return result.rows
+  } catch (error) {
+    console.error('Database Error (getStockists):', error)
+    return []
+  } finally {
+    await client.end()
+  }
+}
+
+export async function addStockist (formData: any) {
+  const client = new Client(dbConfig)
+  try {
+    await client.connect()
+    // Tambahkan stockist_id dan profile_picture
+    const {
+      stockist_id,
+      name,
+      phone,
+      domicile,
+      email,
+      social,
+      profile_picture
+    } = formData
+    await client.query(
+      'INSERT INTO stockists (stockist_id, name, phone, domicile, email, social, profile_picture) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+      [stockist_id, name, phone, domicile, email, social, profile_picture]
+    )
+    revalidatePath('/stockist')
+    return { success: true }
+  } catch (error) {
+    console.error('Database Error (addStockist):', error)
+    return { success: false }
+  } finally {
+    await client.end()
+  }
+}
+
+export async function updateStockist (id: number, formData: any) {
+  const client = new Client(dbConfig)
+  try {
+    await client.connect()
+    const {
+      stockist_id,
+      name,
+      phone,
+      domicile,
+      email,
+      social,
+      profile_picture
+    } = formData
+    await client.query(
+      'UPDATE stockists SET stockist_id=$1, name=$2, phone=$3, domicile=$4, email=$5, social=$6, profile_picture=$7 WHERE id=$8',
+      [stockist_id, name, phone, domicile, email, social, profile_picture, id]
+    )
+    revalidatePath('/stockist')
+    return { success: true }
+  } catch (error) {
+    console.error('Database Error (updateStockist):', error)
+    return { success: false }
+  } finally {
+    await client.end()
+  }
+}
+
+
+export async function deleteStockist (id: number) {
+  const client = new Client(dbConfig)
+  try {
+    await client.connect()
+    await client.query('DELETE FROM stockists WHERE id = $1', [id])
+    revalidatePath('/stockist')
+    return { success: true }
+  } catch (error) {
+    console.error('Database Error (deleteStockist):', error)
+    return { success: false }
+  } finally {
+    await client.end()
+  }
+}
+
+
