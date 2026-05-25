@@ -3,7 +3,6 @@
 
 import React, { useEffect, useState, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-// PASTIKAN markKepinganAsDownloaded SUDAH ADA DI actions.ts ANDA
 import {
   getKepinganByProduct,
   generateKepingan,
@@ -22,9 +21,10 @@ function QrManagementContent() {
   const [kepingans, setKepingans] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [qrCount, setQrCount] = useState<number | string>("");
-  const [isDownloading, setIsDownloading] = useState(false);
+  const [isDownloadingFull, setIsDownloadingFull] = useState(false);
+  const [isDownloadingQrOnly, setIsDownloadingQrOnly] = useState(false);
 
-  // --- 1. LOAD DATA ANTREAN (Hanya yang berstatus NEW) ---
+  // --- 1. LOAD DATA ANTREAN ---
   const loadKepingan = useCallback(async () => {
     if (!productId) return;
     setLoading(true);
@@ -42,7 +42,7 @@ function QrManagementContent() {
     loadKepingan();
   }, [loadKepingan]);
 
-  // --- 2. GENERATE BATCH BARI ---
+  // --- 2. GENERATE BATCH BARU ---
   const handleGenerate = async () => {
     const count =
       typeof qrCount === "number" ? qrCount : parseInt(qrCount as string) || 0;
@@ -52,8 +52,8 @@ function QrManagementContent() {
     try {
       const res = await generateKepingan(parseInt(productId), count);
       if (res.success) {
-        setQrCount(""); // Kosongkan input setelah sukses generate
-        await loadKepingan(); // Tarik data baru ke layar
+        setQrCount("");
+        await loadKepingan();
       } else {
         alert("Error: " + res.error);
       }
@@ -65,15 +65,15 @@ function QrManagementContent() {
     }
   };
 
-  const handleDownloadZip = async () => {
+  // --- 3. DOWNLOAD BATCH ZIP (TEMPLATE LAMA: FULL CARD) ---
+  const handleDownloadFullZip = async () => {
     if (kepingans.length === 0) return alert("Tidak ada data untuk didownload");
 
-    setIsDownloading(true);
+    setIsDownloadingFull(true);
     const zip = new JSZip();
     const QRCode = await import("qrcode");
 
     try {
-      // PROSES MENGGAMBAR KE CANVAS
       for (const item of kepingans) {
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d");
@@ -82,24 +82,18 @@ function QrManagementContent() {
         if (!ctx) continue;
 
         // Background Putih
-        ctx.fillStyle = "#FFFFFF"; // <-- DIUBAH MENJADI PUTIH
+        ctx.fillStyle = "#FFFFFF";
         ctx.fillRect(0, 0, 600, 300);
 
-        // Wadah QR Putih (opsional: bisa dihilangkan/diubah warnanya agar kontras,
-        // tapi jika background sudah putih, ini hanya menegaskan area QR)
+        // Wadah QR Putih/Abu
         ctx.fillStyle = "#F0F0F0";
         ctx.beginPath();
         if (ctx.roundRect) {
           ctx.roundRect(30, 40, 220, 220, 20);
         } else {
-          ctx.fillRect(30, 40, 220, 220); // Fallback browser lama
+          ctx.fillRect(30, 40, 220, 220);
         }
         ctx.fill();
-
-        // (Opsional) Tambahkan border pada wadah QR agar terlihat batasnya di background putih
-        // ctx.strokeStyle = "#FFFFFF";
-        // ctx.lineWidth = 2;
-        // ctx.stroke();
 
         // Generate QR Image
         const qrValue = `https://app.copperium.id/verif/${item.uuid}`;
@@ -116,59 +110,135 @@ function QrManagementContent() {
         });
         ctx.drawImage(qrImg, 45, 55, 190, 190);
 
-        // Teks Informasi
+        // Teks Informasi (Template Lama)
         ctx.textBaseline = "top";
+        ctx.textAlign = "left"; // Reset align ke kiri
 
-        ctx.fillStyle = "#0088CC"; // <-- Diubah sedikit agar lebih kontras di bg putih
+        ctx.fillStyle = "#0088CC";
         ctx.font = "bold 15px Arial";
         ctx.fillText("ASSET ID", 290, 60);
-        ctx.fillStyle = "#000000"; // <-- Teks diubah menjadi Hitam
+        ctx.fillStyle = "#000000";
         ctx.font = "bold 35px monospace";
         ctx.fillText(item.uuid, 290, 80);
 
-        ctx.fillStyle = "#0088CC"; // <-- Diubah sedikit agar lebih kontras di bg putih
+        ctx.fillStyle = "#0088CC";
         ctx.font = "bold 15px Arial";
         ctx.fillText("SPECIFICATION", 290, 130);
-        ctx.fillStyle = "#000000"; // <-- Teks diubah menjadi Hitam
+        ctx.fillStyle = "#000000";
         ctx.font = "bold 35px monospace";
         ctx.fillText(`${item.weight}g | ${item.finest}`, 290, 150);
 
-        ctx.fillStyle = "#FF7700"; // <-- Diubah sedikit agar lebih kontras di bg putih
+        ctx.fillStyle = "#FF7700";
         ctx.font = "bold 15px Arial";
         ctx.fillText("VALIDATION CODE", 290, 200);
-        ctx.fillStyle = "#000000"; // <-- Teks diubah menjadi Hitam
+        ctx.fillStyle = "#000000";
         ctx.font = "900 45px monospace";
         ctx.fillText(item.validation_code, 290, 220);
 
         const imgData = canvas.toDataURL("image/png").split(",")[1];
-        zip.file(`${item.uuid}.png`, imgData, { base64: true });
+        zip.file(`${item.uuid}_FULL.png`, imgData, { base64: true });
       }
 
-      // 1. Download file ZIP-nya
       const content = await zip.generateAsync({ type: "blob" });
-      saveAs(content, `BATCH_${productName.replace(/\s+/g, "_")}.zip`);
+      saveAs(content, `BATCH_FULL_${productName.replace(/\s+/g, "_")}.zip`);
 
-      // 2. Kumpulkan semua UUID yang baru saja sukses didownload
       const uuidsToUpdate = kepingans.map((k) => k.uuid);
-
-      // 3. Ubah statusnya di database menjadi 'DOWNLOADED'
       const updateRes = await markKepinganAsDownloaded(uuidsToUpdate);
 
       if (updateRes.success) {
-        // 4. BERSIHKAN LAYAR & KOTAK INPUT
         setKepingans([]);
         setQrCount("");
-        alert("Batch berhasil didownload! Antrean layar telah dibersihkan.");
+        alert(
+          "Batch Full Card berhasil didownload! Antrean layar dibersihkan.",
+        );
       } else {
-        alert("Download berhasil, tapi gagal mengupdate status di database.");
+        alert("Download berhasil, tapi gagal mengupdate status.");
       }
     } catch (err) {
       console.error(err);
-      alert("Gagal memproses gambar. Periksa konsol.");
+      alert("Gagal memproses gambar.");
     } finally {
-      setIsDownloading(false);
+      setIsDownloadingFull(false);
     }
   };
+
+  // --- 4. DOWNLOAD BATCH ZIP (TEMPLATE BARU: QR ONLY) ---
+  const handleDownloadQrOnlyZip = async () => {
+    if (kepingans.length === 0) return alert("Tidak ada data untuk didownload");
+
+    setIsDownloadingQrOnly(true);
+    const zip = new JSZip();
+    const QRCode = await import("qrcode");
+
+    try {
+      for (const item of kepingans) {
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+
+        // Ukuran Kotak Kompak untuk QR + Validasi Saja
+        canvas.width = 300;
+        canvas.height = 360;
+        if (!ctx) continue;
+
+        // Background Putih
+        ctx.fillStyle = "#FFFFFF";
+        ctx.fillRect(0, 0, 300, 360);
+
+        // Generate QR Image
+        const qrValue = `https://app.copperium.id/verif/${item.uuid}`;
+        const qrDataUrl = await QRCode.toDataURL(qrValue, {
+          margin: 1,
+          width: 240,
+          color: { dark: "#000000", light: "#FFFFFF" },
+        });
+
+        const qrImg = new Image();
+        qrImg.src = qrDataUrl;
+        await new Promise((res) => {
+          qrImg.onload = res;
+        });
+
+        // Gambar QR di tengah atas
+        ctx.drawImage(qrImg, 30, 20, 240, 240);
+
+        // Teks Validation Code di bawah QR
+        ctx.textBaseline = "top";
+        ctx.textAlign = "center";
+
+        ctx.fillStyle = "#FF7700";
+        ctx.font = "bold 14px Arial";
+        ctx.fillText("VALIDATION CODE", 150, 280);
+
+        ctx.fillStyle = "#000000";
+        ctx.font = "900 36px monospace";
+        ctx.fillText(item.validation_code, 150, 305);
+
+        const imgData = canvas.toDataURL("image/png").split(",")[1];
+        zip.file(`${item.uuid}_QR_ONLY.png`, imgData, { base64: true });
+      }
+
+      const content = await zip.generateAsync({ type: "blob" });
+      saveAs(content, `BATCH_QR_ONLY_${productName.replace(/\s+/g, "_")}.zip`);
+
+      const uuidsToUpdate = kepingans.map((k) => k.uuid);
+      const updateRes = await markKepinganAsDownloaded(uuidsToUpdate);
+
+      if (updateRes.success) {
+        setKepingans([]);
+        setQrCount("");
+        alert("Batch QR Only berhasil didownload! Antrean layar dibersihkan.");
+      } else {
+        alert("Download berhasil, tapi gagal mengupdate status.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Gagal memproses gambar QR Only.");
+    } finally {
+      setIsDownloadingQrOnly(false);
+    }
+  };
+
+  const isAnyDownloading = isDownloadingFull || isDownloadingQrOnly;
 
   return (
     <div className="min-h-screen bg-[#050505] text-white p-6 md:p-12">
@@ -184,7 +254,8 @@ function QrManagementContent() {
           BACK TO INVENTORY
         </Link>
 
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-12">
+        {/* HEADER & DOWNLOAD BUTTONS */}
+        <div className="flex flex-col md:flex-row justify-between items-start gap-6 mb-12">
           <div>
             <h1 className="text-4xl font-black italic uppercase tracking-tighter">
               {productName}
@@ -193,23 +264,41 @@ function QrManagementContent() {
               Print Queue Management
             </p>
           </div>
-          <button
-            onClick={handleDownloadZip}
-            disabled={isDownloading || kepingans.length === 0}
-            className="w-full md:w-auto bg-green-500 hover:bg-green-400 disabled:opacity-30 text-black px-8 py-4 rounded-2xl font-black flex items-center justify-center gap-2 transition-all shadow-[0_0_20px_rgba(34,197,94,0.2)]"
-          >
-            {isDownloading ? (
-              <Loader2 className="animate-spin" />
-            ) : (
-              <Download size={20} />
-            )}
-            {isDownloading
-              ? "PROCESSING..."
-              : `DOWNLOAD ${kepingans.length} LABELS (ZIP)`}
-          </button>
+
+          <div className="flex flex-col gap-3 w-full md:w-auto">
+            {/* Tombol Lama: FULL CARD */}
+            <button
+              onClick={handleDownloadFullZip}
+              disabled={isAnyDownloading || kepingans.length === 0}
+              className="w-full md:w-auto bg-green-500 hover:bg-green-400 disabled:opacity-30 text-black px-8 py-3.5 rounded-2xl font-black flex items-center justify-center gap-2 transition-all shadow-[0_0_20px_rgba(34,197,94,0.2)]"
+            >
+              {isDownloadingFull ? (
+                <Loader2 className="animate-spin" />
+              ) : (
+                <Download size={20} />
+              )}
+              {isDownloadingFull
+                ? "PROCESSING FULL..."
+                : `DOWNLOAD FULL LABELS`}
+            </button>
+
+            {/* Tombol Baru: QR ONLY */}
+            <button
+              onClick={handleDownloadQrOnlyZip}
+              disabled={isAnyDownloading || kepingans.length === 0}
+              className="w-full md:w-auto bg-white hover:bg-gray-200 disabled:opacity-30 text-black px-8 py-3.5 rounded-2xl font-black flex items-center justify-center gap-2 transition-all shadow-[0_0_20px_rgba(255,255,255,0.2)]"
+            >
+              {isDownloadingQrOnly ? (
+                <Loader2 className="animate-spin" />
+              ) : (
+                <QrCode size={20} />
+              )}
+              {isDownloadingQrOnly ? "PROCESSING QR..." : `GENERATE QR ONLY`}
+            </button>
+          </div>
         </div>
 
-        {/* Control Panel */}
+        {/* Control Panel (Generate Kepingan Baru) */}
         <div className="bg-white/[0.03] border border-white/10 p-8 rounded-[2.5rem] mb-12 flex flex-col md:flex-row items-center gap-8">
           <div className="w-full md:w-1/3">
             <label className="text-[10px] font-black text-white/30 block mb-3 tracking-widest uppercase text-center md:text-left">
@@ -235,7 +324,7 @@ function QrManagementContent() {
             <button
               onClick={handleGenerate}
               disabled={loading}
-              className="w-full bg-white text-black py-5 rounded-2xl font-black hover:bg-cyan-400 transition-all flex justify-center items-center gap-2 shadow-xl shadow-white/5 disabled:opacity-50"
+              className="w-full bg-cyan-500 text-black py-5 rounded-2xl font-black hover:bg-cyan-400 transition-all flex justify-center items-center gap-2 shadow-xl shadow-cyan-500/20 disabled:opacity-50"
             >
               {loading ? (
                 <Loader2 className="animate-spin" />
@@ -263,7 +352,6 @@ function QrManagementContent() {
                 key={k.uuid}
                 className="bg-white/[0.02] border border-white/5 p-6 rounded-2xl hover:border-cyan-500/30 transition-all group relative overflow-hidden"
               >
-                {/* Badge NEW */}
                 <div className="absolute top-0 right-0 bg-cyan-500 text-black text-[8px] font-black px-3 py-1 rounded-bl-lg tracking-widest">
                   NEW
                 </div>
