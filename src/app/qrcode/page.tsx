@@ -175,20 +175,20 @@ function QrManagementContent() {
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d");
 
-        // Ukuran Kotak Kompak untuk QR + Validasi Saja
+        // Ukuran Kotak Persegi (hanya untuk QR)
         canvas.width = 300;
-        canvas.height = 360;
+        canvas.height = 300;
         if (!ctx) continue;
 
         // Background Putih
         ctx.fillStyle = "#FFFFFF";
-        ctx.fillRect(0, 0, 300, 360);
+        ctx.fillRect(0, 0, 300, 300);
 
         // Generate QR Image
         const qrValue = `https://app.copperium.id/verif/${item.uuid}`;
         const qrDataUrl = await QRCode.toDataURL(qrValue, {
-          margin: 1,
-          width: 240,
+          margin: 1, // Margin bawaan QR
+          width: 260,
           color: { dark: "#000000", light: "#FFFFFF" },
         });
 
@@ -198,23 +198,18 @@ function QrManagementContent() {
           qrImg.onload = res;
         });
 
-        // Gambar QR di tengah atas
-        ctx.drawImage(qrImg, 30, 20, 240, 240);
+        // Gambar QR pas di tengah (sisa margin putih 20px keliling)
+        ctx.drawImage(qrImg, 20, 20, 260, 260);
 
-        // Teks Validation Code di bawah QR
-        ctx.textBaseline = "top";
-        ctx.textAlign = "center";
-
-        ctx.fillStyle = "#FF7700";
-        ctx.font = "bold 14px Arial";
-        ctx.fillText("VALIDATION CODE", 150, 280);
-
-        ctx.fillStyle = "#000000";
-        ctx.font = "900 36px monospace";
-        ctx.fillText(item.validation_code, 150, 305);
+        // Teks Validation Code DIHAPUS dari gambar (Canvas bersih)
 
         const imgData = canvas.toDataURL("image/png").split(",")[1];
-        zip.file(`${item.uuid}_QR_ONLY.png`, imgData, { base64: true });
+
+        // --- PENAMAAN FILE DIUBAH ---
+        // Contoh hasil: 6f4a2b_PIN-938472.png
+        zip.file(`${item.uuid}_PIN-${item.validation_code}.png`, imgData, {
+          base64: true,
+        });
       }
 
       const content = await zip.generateAsync({ type: "blob" });
