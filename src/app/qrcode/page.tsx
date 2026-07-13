@@ -73,6 +73,9 @@ function QrManagementContent() {
     const zip = new JSZip();
     const QRCode = await import("qrcode");
 
+    // Header untuk file CSV
+    let csvContent = "UUID,Link_QR,Kode_Validasi,ID_Produk,Nama_Produk\n";
+
     try {
       for (const item of kepingans) {
         const canvas = document.createElement("canvas");
@@ -97,6 +100,10 @@ function QrManagementContent() {
 
         // Generate QR Image
         const qrValue = `https://app.copperium.id/verif/${item.uuid}`;
+
+        // Tambahkan data ke baris CSV
+        csvContent += `${item.uuid},${qrValue},${item.validation_code},${productId},"${productName}"\n`;
+
         const qrDataUrl = await QRCode.toDataURL(qrValue, {
           margin: 1,
           width: 190,
@@ -112,7 +119,7 @@ function QrManagementContent() {
 
         // Teks Informasi (Template Lama)
         ctx.textBaseline = "top";
-        ctx.textAlign = "left"; // Reset align ke kiri
+        ctx.textAlign = "left";
 
         ctx.fillStyle = "#0088CC";
         ctx.font = "bold 15px Arial";
@@ -139,6 +146,9 @@ function QrManagementContent() {
         zip.file(`${item.uuid}_FULL.png`, imgData, { base64: true });
       }
 
+      // Masukkan file CSV ke dalam ZIP
+      zip.file(`DATA_KODE_${productName.replace(/\s+/g, "_")}.csv`, csvContent);
+
       const content = await zip.generateAsync({ type: "blob" });
       saveAs(content, `BATCH_FULL_${productName.replace(/\s+/g, "_")}.zip`);
 
@@ -149,7 +159,7 @@ function QrManagementContent() {
         setKepingans([]);
         setQrCount("");
         alert(
-          "Batch Full Card berhasil didownload! Antrean layar dibersihkan.",
+          "Batch Full Card berhasil didownload! File ZIP berisi gambar dan file Excel (CSV).",
         );
       } else {
         alert("Download berhasil, tapi gagal mengupdate status.");
@@ -170,6 +180,9 @@ function QrManagementContent() {
     const zip = new JSZip();
     const QRCode = await import("qrcode");
 
+    // Header untuk file CSV
+    let csvContent = "UUID,Link_QR,Kode_Validasi,ID_Produk,Nama_Produk\n";
+
     try {
       for (const item of kepingans) {
         const canvas = document.createElement("canvas");
@@ -186,6 +199,10 @@ function QrManagementContent() {
 
         // Generate QR Image
         const qrValue = `https://app.copperium.id/verif/${item.uuid}`;
+
+        // Tambahkan data ke baris CSV
+        csvContent += `${item.uuid},${qrValue},${item.validation_code},${productId},"${productName}"\n`;
+
         const qrDataUrl = await QRCode.toDataURL(qrValue, {
           margin: 1, // Margin bawaan QR
           width: 260,
@@ -201,16 +218,19 @@ function QrManagementContent() {
         // Gambar QR pas di tengah (sisa margin putih 20px keliling)
         ctx.drawImage(qrImg, 20, 20, 260, 260);
 
-        // Teks Validation Code DIHAPUS dari gambar (Canvas bersih)
-
         const imgData = canvas.toDataURL("image/png").split(",")[1];
 
-        // --- PENAMAAN FILE DIUBAH ---
-        // Contoh hasil: 6f4a2b_PIN-938472.png
+        // --- PENAMAAN FILE DIUBAH (Sesuai request sebelumnya) ---
         zip.file(`${item.uuid}_PIN-${item.validation_code}.png`, imgData, {
           base64: true,
         });
       }
+
+      // Masukkan file CSV ke dalam ZIP
+      zip.file(
+        `DATA_KODE_QR_ONLY_${productName.replace(/\s+/g, "_")}.csv`,
+        csvContent,
+      );
 
       const content = await zip.generateAsync({ type: "blob" });
       saveAs(content, `BATCH_QR_ONLY_${productName.replace(/\s+/g, "_")}.zip`);
@@ -221,7 +241,9 @@ function QrManagementContent() {
       if (updateRes.success) {
         setKepingans([]);
         setQrCount("");
-        alert("Batch QR Only berhasil didownload! Antrean layar dibersihkan.");
+        alert(
+          "Batch QR Only berhasil didownload! File ZIP berisi gambar dan file Excel (CSV).",
+        );
       } else {
         alert("Download berhasil, tapi gagal mengupdate status.");
       }
