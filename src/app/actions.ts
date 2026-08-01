@@ -214,29 +214,80 @@ export async function updateMasterProduct (id: number, formData: any) {
 }
 
 
-export async function getAllKepingan () {
+export async function getAllKepingan (params?: {
+  page?: number
+  limit?: number
+  search?: string
+}) {
+  // Atur nilai default jika parameter tidak dikirim
+  const page = params?.page || 1
+  const limit = params?.limit || 20
+  const search = params?.search || ''
+  const offset = (page - 1) * limit
+
   const client = new Client(dbConfig)
   try {
     await client.connect()
-    // JOIN dengan tabel products agar kita tahu QR ini milik produk apa
-    const query = `
+
+    // 1. Siapkan Query Dasar
+    let dataQuery = `
       SELECT k.*, p.name as product_name 
       FROM kepingan k
       JOIN products p ON k.product_id = p.id
-      ORDER BY k.created_at DESC
     `
-    const res = await client.query(query)
-    return res.rows
+    let countQuery = `
+      SELECT COUNT(*) 
+      FROM kepingan k
+      JOIN products p ON k.product_id = p.id
+    `
+
+    const queryParams: any[] = []
+    const countParams: any[] = []
+
+    // 2. Tambahkan filter pencarian jika ada
+    if (search) {
+      const searchParam = `%${search}%` // Format pencarian wildcard SQL
+      const whereClause = ` WHERE k.uuid ILIKE $1 OR k.validation_code ILIKE $1 OR p.name ILIKE $1`
+
+      dataQuery += whereClause
+      countQuery += whereClause
+
+      queryParams.push(searchParam)
+      countParams.push(searchParam)
+    }
+
+    // 3. Tambahkan Sorting dan Pagination ke Data Query
+    // Menentukan index parameter ($1, $2, $3 dst) secara dinamis
+    const limitIndex = queryParams.length + 1
+    const offsetIndex = queryParams.length + 2
+
+    dataQuery += ` ORDER BY k.created_at DESC LIMIT $${limitIndex} OFFSET $${offsetIndex}`
+    queryParams.push(limit, offset)
+
+    // 4. Eksekusi kedua query secara bersamaan untuk performa maksimal
+    const [dataRes, countRes] = await Promise.all([
+      client.query(dataQuery, queryParams),
+      client.query(countQuery, countParams)
+    ])
+
+    // Kembalikan format { data, total } agar bisa dibaca oleh frontend baru
+    return {
+      data: dataRes.rows,
+      total: parseInt(countRes.rows[0].count, 10)
+    }
   } catch (error) {
     console.error('Database Error (getAllKepingan):', error)
-    return []
+    // Jika gagal, kembalikan array kosong dan total 0 agar frontend tidak error
+    return { data: [], total: 0 }
   } finally {
     try {
       await client.end()
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (e) {}
   }
 }
+
+
 
 
 export async function markKepinganAsDownloaded(uuids: string[]) {
