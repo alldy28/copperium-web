@@ -73,13 +73,37 @@ function QrManagementContent() {
     const zip = new JSZip();
     const QRCode = await import("qrcode");
 
-    // Header untuk file CSV
     let csvContent = "UUID,Link_QR,Kode_Validasi,ID_Produk,Nama_Produk\n";
+
+    // Fungsi helper agar teks otomatis mengecil jika kepanjangan
+    const drawAutoShrinkText = (
+      ctx: CanvasRenderingContext2D,
+      text: string,
+      x: number,
+      y: number,
+      defaultFontSize: number,
+      fontWeight: string,
+      fontFamily: string,
+      maxWidth: number,
+    ) => {
+      let fontSize = defaultFontSize;
+      ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+
+      // Looping untuk mengurangi ukuran font jika masih kepanjangan (minimal ukuran font 10px)
+      while (ctx.measureText(text).width > maxWidth && fontSize > 10) {
+        fontSize -= 1;
+        ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+      }
+
+      ctx.fillText(text, x, y);
+    };
 
     try {
       for (const item of kepingans) {
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d");
+
+        // Kembalikan ke ukuran 600px karena teksnya yang sekarang menyesuaikan (mengecil)
         canvas.width = 600;
         canvas.height = 300;
         if (!ctx) continue;
@@ -100,8 +124,6 @@ function QrManagementContent() {
 
         // Generate QR Image
         const qrValue = `https://app.copperium.id/verif/${item.uuid}`;
-
-        // Tambahkan data ke baris CSV
         csvContent += `${item.uuid},${qrValue},${item.validation_code},${productId},"${productName}"\n`;
 
         const qrDataUrl = await QRCode.toDataURL(qrValue, {
@@ -117,36 +139,69 @@ function QrManagementContent() {
         });
         ctx.drawImage(qrImg, 45, 55, 190, 190);
 
-        // Teks Informasi (Template Lama)
+        // --- TEKS INFORMASI ---
         ctx.textBaseline = "top";
         ctx.textAlign = "left";
 
+        // Batas ruang untuk teks (Mulai dari X: 290 sampai batas kanan padding 30px -> Lebar Max = 280)
+        const textMaxWidth = 280;
+
+        // 1. ASSET ID
         ctx.fillStyle = "#0088CC";
         ctx.font = "bold 15px Arial";
         ctx.fillText("ASSET ID", 290, 60);
-        ctx.fillStyle = "#000000";
-        ctx.font = "bold 35px monospace";
-        ctx.fillText(item.uuid, 290, 80);
 
+        ctx.fillStyle = "#000000";
+        drawAutoShrinkText(
+          ctx,
+          item.uuid,
+          290,
+          80,
+          35,
+          "bold",
+          "monospace",
+          textMaxWidth,
+        );
+
+        // 2. SPECIFICATION
         ctx.fillStyle = "#0088CC";
         ctx.font = "bold 15px Arial";
         ctx.fillText("SPECIFICATION", 290, 130);
-        ctx.fillStyle = "#000000";
-        ctx.font = "bold 35px monospace";
-        ctx.fillText(`${item.weight}g | ${item.finest}`, 290, 150);
 
+        ctx.fillStyle = "#000000";
+        const specText = `${item.weight}g | ${item.finest}`;
+        drawAutoShrinkText(
+          ctx,
+          specText,
+          290,
+          150,
+          35,
+          "bold",
+          "monospace",
+          textMaxWidth,
+        );
+
+        // 3. VALIDATION CODE
         ctx.fillStyle = "#FF7700";
         ctx.font = "bold 15px Arial";
         ctx.fillText("VALIDATION CODE", 290, 200);
+
         ctx.fillStyle = "#000000";
-        ctx.font = "900 45px monospace";
-        ctx.fillText(item.validation_code, 290, 220);
+        drawAutoShrinkText(
+          ctx,
+          item.validation_code,
+          290,
+          220,
+          45,
+          "900",
+          "monospace",
+          textMaxWidth,
+        );
 
         const imgData = canvas.toDataURL("image/png").split(",")[1];
         zip.file(`${item.uuid}_FULL.png`, imgData, { base64: true });
       }
 
-      // Masukkan file CSV ke dalam ZIP
       zip.file(`DATA_KODE_${productName.replace(/\s+/g, "_")}.csv`, csvContent);
 
       const content = await zip.generateAsync({ type: "blob" });
