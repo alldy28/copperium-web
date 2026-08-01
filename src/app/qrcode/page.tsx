@@ -89,7 +89,6 @@ function QrManagementContent() {
       let fontSize = defaultFontSize;
       ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
 
-      // Looping untuk mengurangi ukuran font jika masih kepanjangan (minimal ukuran font 10px)
       while (ctx.measureText(text).width > maxWidth && fontSize > 10) {
         fontSize -= 1;
         ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
@@ -103,22 +102,34 @@ function QrManagementContent() {
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d");
 
-        // Kembalikan ke ukuran 600px karena teksnya yang sekarang menyesuaikan (mengecil)
-        canvas.width = 600;
-        canvas.height = 300;
+        // 1. Padding 5px: Ukuran kanvas diperkecil disesuaikan dengan padding tipis
+        canvas.width = 520;
+        canvas.height = 230;
         if (!ctx) continue;
 
-        // Background Putih
-        ctx.fillStyle = "#FFFFFF";
-        ctx.fillRect(0, 0, 600, 300);
+        // Kosongkan kanvas agar pinggiran membulat menjadi transparan (bolong)
+        ctx.clearRect(0, 0, 520, 230);
 
-        // Wadah QR Putih/Abu
+        // 2. Potong (Clip) seluruh kanvas agar ujungnya membulat
+        ctx.beginPath();
+        if (ctx.roundRect) {
+          ctx.roundRect(0, 0, 520, 230, 20); // Corner Radius disesuaikan
+        } else {
+          ctx.rect(0, 0, 520, 230);
+        }
+        ctx.clip();
+
+        // Background Utama
+        ctx.fillStyle = "#FFFFFF";
+        ctx.fillRect(0, 0, 520, 230);
+
+        // Wadah QR (Merapat ke pinggir kiri dan atas dengan jarak tepat 5px)
         ctx.fillStyle = "#F0F0F0";
         ctx.beginPath();
         if (ctx.roundRect) {
-          ctx.roundRect(30, 40, 220, 220, 20);
+          ctx.roundRect(5, 5, 220, 220, 16); // X: 5, Y: 5
         } else {
-          ctx.fillRect(30, 40, 220, 220);
+          ctx.fillRect(5, 5, 220, 220);
         }
         ctx.fill();
 
@@ -128,7 +139,7 @@ function QrManagementContent() {
 
         const qrDataUrl = await QRCode.toDataURL(qrValue, {
           margin: 1,
-          width: 190,
+          width: 210, // Dibesarkan sedikit agar padding di dalam kotak QR juga 5px
           color: { dark: "#000000", light: "#FFFFFF" },
         });
 
@@ -137,44 +148,49 @@ function QrManagementContent() {
         await new Promise((res) => {
           qrImg.onload = res;
         });
-        ctx.drawImage(qrImg, 45, 55, 190, 190);
+
+        // Gambar QR (Offset 5px dari titik X=5, Y=5 wadah -> menjadi 10, 10)
+        ctx.drawImage(qrImg, 10, 10, 210, 210);
 
         // --- TEKS INFORMASI ---
         ctx.textBaseline = "top";
         ctx.textAlign = "left";
 
-        // Batas ruang untuk teks (Mulai dari X: 290 sampai batas kanan padding 30px -> Lebar Max = 280)
-        const textMaxWidth = 280;
+        // Teks dimulai dari X: 240 (5 padding kiri + 220 lebar QR + 15 jarak pemisah tengah)
+        const textX = 240;
 
-        // 1. ASSET ID
+        // Lebar maksimal 275 (X: 240 + Lebar: 275 = 515, sisa tepat 5px padding kanan dari total kanvas 520)
+        const textMaxWidth = 275;
+
+        // 1. ASSET ID (Padding atas 15px agar seimbang dengan tulisan di bawahnya)
         ctx.fillStyle = "#0088CC";
         ctx.font = "bold 15px Arial";
-        ctx.fillText("ASSET ID", 290, 60);
+        ctx.fillText("ASSET ID", textX, 20);
 
         ctx.fillStyle = "#000000";
         drawAutoShrinkText(
           ctx,
           item.uuid,
-          290,
-          80,
+          textX,
+          43,
           35,
           "bold",
           "monospace",
           textMaxWidth,
         );
 
-        // 2. SPECIFICATION
+        // 2. SPECIFICATION (Posisi Y dirapikan ke 95 agar tidak menabrak)
         ctx.fillStyle = "#0088CC";
         ctx.font = "bold 15px Arial";
-        ctx.fillText("SPECIFICATION", 290, 130);
+        ctx.fillText("SPECIFICATION", textX, 84);
 
         ctx.fillStyle = "#000000";
         const specText = `${item.weight}g | ${item.finest}`;
         drawAutoShrinkText(
           ctx,
           specText,
-          290,
-          150,
+          textX,
+          106,
           35,
           "bold",
           "monospace",
@@ -184,14 +200,14 @@ function QrManagementContent() {
         // 3. VALIDATION CODE
         ctx.fillStyle = "#FF7700";
         ctx.font = "bold 15px Arial";
-        ctx.fillText("VALIDATION CODE", 290, 200);
+        ctx.fillText("VALIDATION CODE", textX, 148);
 
         ctx.fillStyle = "#000000";
         drawAutoShrinkText(
           ctx,
           item.validation_code,
-          290,
-          220,
+          textX,
+          166,
           45,
           "900",
           "monospace",
