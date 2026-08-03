@@ -124,7 +124,7 @@ function QrManagementContent() {
         ctx.fillRect(0, 0, 520, 230);
 
         // Wadah QR (Merapat ke pinggir kiri dan atas dengan jarak tepat 5px)
-        ctx.fillStyle = "#F0F0F0";
+        ctx.fillStyle = "#ffffff";
         ctx.beginPath();
         if (ctx.roundRect) {
           ctx.roundRect(5, 5, 220, 220, 16); // X: 5, Y: 5
@@ -185,7 +185,7 @@ function QrManagementContent() {
         ctx.fillText("SPECIFICATION", textX, 84);
 
         ctx.fillStyle = "#000000";
-        const specText = `${item.weight}g | ${item.finest}`;
+        const specText = `${item.weight}g|${item.finest}`;
         drawAutoShrinkText(
           ctx,
           specText,
